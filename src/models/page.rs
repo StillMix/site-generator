@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 
-use crate::elements::{UIElement};
+use crate::elements::UIElement;
 
 
 // Убираем derive для структуры Page
+#[allow(dead_code)]
 pub struct Page {
     pub id: String,
     pub name: String,

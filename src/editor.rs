@@ -73,31 +73,34 @@ impl Editor {
     
     // Показать панель элементов
     // Показать панель элементов
-fn show_elements_panel(&mut self, ui: &mut Ui, _page: &mut Page) {
-    ui.heading("Элементы");
-    
-    ui.separator();
-    
-    ui.vertical(|ui| {
-        // Создаем метку для кнопки, которую можно перетаскивать
-        let btn_response = ui.selectable_label(
-            self.selected_element_type == Some(ElementType::Button), 
-            "Кнопка"
-        );
+    fn show_elements_panel(&mut self, ui: &mut Ui, _page: &mut Page) {
+        ui.heading("Элементы");
         
-        if btn_response.clicked() {
-            self.selected_element_type = Some(ElementType::Button);
-        }
+        ui.separator();
         
-        // Начинаем перетаскивание, если пользователь зажал кнопку мыши на элементе
-        if btn_response.dragged() {
-            self.dragging_new_element = true;
-            if let Some(pos) = ui.ctx().pointer_interact_pos() {
-                self.mouse_pos = Some((pos.x, pos.y));
+        ui.vertical(|ui| {
+            // Создаем кнопку, которую можно перетаскивать
+            let btn_response = ui.button("Кнопка");
+            
+            // Обрабатываем клик на кнопке
+            if btn_response.clicked() {
+                self.selected_element_type = Some(ElementType::Button);
             }
-        }
-    });
-}
+            
+            // Проверяем, начато ли перетаскивание
+            if btn_response.drag_started() {
+                self.dragging_new_element = true;
+                self.selected_element_type = Some(ElementType::Button);
+            }
+            
+            // Обновляем позицию мыши во время перетаскивания
+            if self.dragging_new_element && btn_response.dragged() {
+                if let Some(pos) = ui.ctx().pointer_interact_pos() {
+                    self.mouse_pos = Some((pos.x, pos.y));
+                }
+            }
+        });
+    }
     // Показать редактор свойств
     fn show_properties(&mut self, ui: &mut Ui, page: &mut Page) {
         ui.heading("Свойства");
@@ -137,7 +140,11 @@ fn show_elements_panel(&mut self, ui: &mut Ui, _page: &mut Page) {
     
     // Показать область редактирования
     // Показать область редактирования
-fn show_editor_area(&mut self, ui: &mut Ui, page: &mut Page) {
+    fn show_editor_area(&mut self, ui: &mut Ui, page: &mut Page) {
+        // Отладочный вывод состояния перетаскивания
+        if self.dragging_new_element {
+            println!("Перетаскивание активно: {:?}", self.mouse_pos);
+        }
     let (response, painter) = ui.allocate_painter(
         ui.available_size(),
         egui::Sense::click_and_drag()
@@ -197,21 +204,25 @@ fn show_editor_area(&mut self, ui: &mut Ui, page: &mut Page) {
                 }
             }
         }
-    } else if response.drag_released() {
+    }else if response.drag_released() {
         // Отпускание кнопки мыши после перетаскивания
         if self.dragging_new_element {
-            if let Some(pos) = response.interact_pointer_pos {
-                match self.selected_element_type {
-                    Some(ElementType::Button) => {
-                        // Создаем новую кнопку
-                        let mut button = crate::elements::button::Button::new();
-                        // Устанавливаем позицию, учитывая центр кнопки
-                        button.set_position((pos.x - 50.0, pos.y - 25.0));
-                        // Добавляем кнопку на страницу
-                        page.add_element(Box::new(button));
-                    },
-                    _ => {
-                        // Здесь будет логика для других типов элементов
+            if let Some(pos) = ui.ctx().pointer_interact_pos() {  // Используем ctx().pointer_interact_pos() вместо response.interact_pointer_pos
+                // Проверяем, что позиция находится внутри области редактирования
+                if rect.contains(pos)  {
+                    match self.selected_element_type {
+                        Some(ElementType::Button) => {
+                            // Создаем новую кнопку
+                            let mut button = crate::elements::button::Button::new();
+                            // Устанавливаем позицию, учитывая центр кнопки
+                            button.set_position((pos.x - 50.0, pos.y - 25.0));
+                            // Добавляем кнопку на страницу
+                            page.add_element(Box::new(button));
+                            println!("Добавлена новая кнопка в позиции ({}, {})", pos.x, pos.y);
+                        },
+                        _ => {
+                            // Здесь будет логика для других типов элементов
+                        }
                     }
                 }
             }
