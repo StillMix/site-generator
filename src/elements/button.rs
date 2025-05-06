@@ -97,7 +97,6 @@ impl UIElement for Button {
         );
         
         // Определяем цвет фона
-        // Определяем цвет фона
 let fill_color = if selected {
     Color32::from_rgba_premultiplied(100, 150, 255, 100)
 } else {

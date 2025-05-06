@@ -65,7 +65,7 @@ impl ElementBase {
         Self {
             id: Uuid::new_v4().to_string(),
             element_type,
-            position: (0.0, 0.0),
+            position: (100.0, 100.0), // Изменено с (0.0, 0.0) для лучшей видимости
             size: (100.0, 50.0),
             styles: HashMap::new(),
             attributes: HashMap::new(),

@@ -1,4 +1,5 @@
-use crate::elements::{ElementType};
+use crate::elements::ElementType;
+use crate::elements::UIElement; // Добавьте эту строку
 use crate::elements::button::Button;
 use crate::models::page::Page;
 use egui::{Ui, Context, Color32};
@@ -11,6 +12,10 @@ pub struct Editor {
     selected_element_id: Option<String>,
     // Выбранный тип элемента для добавления
     selected_element_type: Option<ElementType>,
+    // Перетаскивание элемента
+    dragging_new_element: bool,
+    // Позиция мыши
+    mouse_pos: Option<(f32, f32)>,
 }
 
 impl Editor {
@@ -18,11 +23,13 @@ impl Editor {
         Self {
             selected_element_id: None,
             selected_element_type: Some(ElementType::Button), // По умолчанию выбран тип "Кнопка"
+            dragging_new_element: false,
+            mouse_pos: None,
         }
     }
     
     // Основной метод отображения редактора
-    pub fn show(&mut self, ctx: &Context, ui: &mut Ui, page: &mut Page) {
+    pub fn show(&mut self, ctx: &Context, _ui: &mut Ui, page: &mut Page) {
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
             self.show_toolbar(ui, page);
         });
@@ -65,38 +72,32 @@ impl Editor {
     }
     
     // Показать панель элементов
-    fn show_elements_panel(&mut self, ui: &mut Ui, page: &mut Page) {
-        ui.heading("Элементы");
+    // Показать панель элементов
+fn show_elements_panel(&mut self, ui: &mut Ui, _page: &mut Page) {
+    ui.heading("Элементы");
+    
+    ui.separator();
+    
+    ui.vertical(|ui| {
+        // Создаем метку для кнопки, которую можно перетаскивать
+        let btn_response = ui.selectable_label(
+            self.selected_element_type == Some(ElementType::Button), 
+            "Кнопка"
+        );
         
-        ui.separator();
+        if btn_response.clicked() {
+            self.selected_element_type = Some(ElementType::Button);
+        }
         
-        ui.vertical(|ui| {
-            if ui.selectable_label(
-                self.selected_element_type == Some(ElementType::Button), 
-                "Кнопка"
-            ).clicked() {
-                self.selected_element_type = Some(ElementType::Button);
-            }
-        });
-        
-        ui.separator();
-        
-        // Добавляем кнопку "Добавить элемент"
-        if ui.button("Добавить элемент").clicked() {
-            match self.selected_element_type {
-                Some(ElementType::Button) => {
-                    // Создаем новую кнопку
-                    let button = Button::new();
-                    // Добавляем кнопку на страницу
-                    page.add_element(Box::new(button));
-                },
-                _ => {
-                    // Здесь будет логика для других типов элементов
-                }
+        // Начинаем перетаскивание, если пользователь зажал кнопку мыши на элементе
+        if btn_response.dragged() {
+            self.dragging_new_element = true;
+            if let Some(pos) = ui.ctx().pointer_interact_pos() {
+                self.mouse_pos = Some((pos.x, pos.y));
             }
         }
-    }
-    
+    });
+}
     // Показать редактор свойств
     fn show_properties(&mut self, ui: &mut Ui, page: &mut Page) {
         ui.heading("Свойства");
@@ -135,47 +136,94 @@ impl Editor {
     }
     
     // Показать область редактирования
-    fn show_editor_area(&mut self, ui: &mut Ui, page: &mut Page) {
-        let (response, painter) = ui.allocate_painter(
-            ui.available_size(),
-            egui::Sense::click_and_drag()
-        );
-        
-        let rect = response.rect;
-        
-        // Отрисовываем фон рабочей области
-        painter.rect_filled(rect, 0.0, Color32::WHITE);
-        
-        // Отрисовываем элементы страницы
-        for element in &page.elements {
-            let selected = Some(element.get_id().to_string()) == self.selected_element_id;
-            element.render(&painter, selected);
-        }
-        
-        // Обработка событий мыши
-        if response.clicked() {
-            // Клик мыши
-            let pos = response.interact_pointer_pos.unwrap();
-            let click_pos = (pos.x, pos.y);
-            
-            if let Some(element) = page.find_element_at_point(click_pos) {
-                // Выбираем элемент
-                self.selected_element_id = Some(element.get_id().to_string());
-            } else {
-                // Сбрасываем выбор
-                self.selected_element_id = None;
+    // Показать область редактирования
+fn show_editor_area(&mut self, ui: &mut Ui, page: &mut Page) {
+    let (response, painter) = ui.allocate_painter(
+        ui.available_size(),
+        egui::Sense::click_and_drag()
+    );
+    
+    let rect = response.rect;
+    
+    // Отрисовываем фон рабочей области
+    painter.rect_filled(rect, 0.0, Color32::WHITE);
+    
+    // Получаем текущую позицию мыши
+    if let Some(pos) = ui.ctx().pointer_interact_pos() {
+        self.mouse_pos = Some((pos.x, pos.y));
+    }
+    
+    // Отрисовываем элементы страницы
+    for element in &page.elements {
+        let selected = Some(element.get_id().to_string()) == self.selected_element_id;
+        element.render(&painter, selected);
+    }
+    
+    // Если перетаскиваем новый элемент, отображаем его предпросмотр
+    if self.dragging_new_element {
+        if let Some(pos) = self.mouse_pos {
+            // Создаем временную кнопку для отображения предпросмотра
+            if let Some(ElementType::Button) = self.selected_element_type {
+                let mut preview_button = crate::elements::button::Button::new();
+                preview_button.set_position((pos.0 - 50.0, pos.1 - 25.0)); // Центрируем кнопку относительно курсора
+                preview_button.render(&painter, true);
             }
-        } else if response.dragged() {
-            // Перетаскивание
-            if let Some(pos) = response.interact_pointer_pos {
-                if let Some(element_id) = &self.selected_element_id {
-                    if let Some(element) = page.find_element_mut(element_id) {
-                        // Перемещаем выбранный элемент к текущей позиции мыши
-                        let size = element.get_size();
-                        element.set_position((pos.x - size.0 / 2.0, pos.y - size.1 / 2.0));
-                    }
+            // Здесь можно добавить другие типы элементов
+        }
+    }
+    
+    // Обработка событий мыши
+    if response.clicked() {
+        // Клик мыши
+        let pos = response.interact_pointer_pos.unwrap();
+        let click_pos = (pos.x, pos.y);
+        
+        if let Some(element) = page.find_element_at_point(click_pos) {
+            // Выбираем элемент
+            self.selected_element_id = Some(element.get_id().to_string());
+            self.dragging_new_element = false;
+        } else {
+            // Сбрасываем выбор
+            self.selected_element_id = None;
+        }
+    } else if response.dragged() {
+        // Перетаскивание
+        if let Some(pos) = response.interact_pointer_pos {
+            if let Some(element_id) = &self.selected_element_id {
+                if let Some(element) = page.find_element_mut(element_id) {
+                    // Перемещаем выбранный элемент к текущей позиции мыши
+                    let size = element.get_size();
+                    element.set_position((pos.x - size.0 / 2.0, pos.y - size.1 / 2.0));
                 }
             }
         }
+    } else if response.drag_released() {
+        // Отпускание кнопки мыши после перетаскивания
+        if self.dragging_new_element {
+            if let Some(pos) = response.interact_pointer_pos {
+                match self.selected_element_type {
+                    Some(ElementType::Button) => {
+                        // Создаем новую кнопку
+                        let mut button = crate::elements::button::Button::new();
+                        // Устанавливаем позицию, учитывая центр кнопки
+                        button.set_position((pos.x - 50.0, pos.y - 25.0));
+                        // Добавляем кнопку на страницу
+                        page.add_element(Box::new(button));
+                    },
+                    _ => {
+                        // Здесь будет логика для других типов элементов
+                    }
+                }
+            }
+            // Завершаем перетаскивание
+            self.dragging_new_element = false;
+        }
     }
+    
+
+// Отменяем перетаскивание, если кнопка мыши отпущена вне редактора
+if !ui.input(|i| i.pointer.any_down()) { // Исправлено с ui.ctx().is_pointer_button_down()
+    self.dragging_new_element = false;
+}
+}
 }
