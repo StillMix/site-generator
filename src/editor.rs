@@ -258,21 +258,26 @@ impl Editor {
                     }
                     
                     // Добавление нового стиля
-                    ui.horizontal(|ui| {
-                        static mut NEW_STYLE_KEY: String = String::new();
-                        static mut NEW_STYLE_VALUE: String = String::new();
-                        
-                        unsafe {
-                            ui.text_edit_singleline(&mut NEW_STYLE_KEY);
-                            ui.text_edit_singleline(&mut NEW_STYLE_VALUE);
-                            
-                            if ui.button("Добавить стиль").clicked() && !NEW_STYLE_KEY.is_empty() {
-                                element.styles.insert(NEW_STYLE_KEY.clone(), NEW_STYLE_VALUE.clone());
-                                NEW_STYLE_KEY = String::new();
-                                NEW_STYLE_VALUE = String::new();
-                            }
-                        }
-                    });
+// Добавление нового стиля
+ui.horizontal(|ui| {
+    // Используем состояние egui вместо статических переменных
+    let mut state = ui.data_mut(|d| d.get_temp::<(String, String)>(egui::Id::new("new_style_state"))
+        .unwrap_or_default());
+    
+    let key_label = ui.label("Ключ:");
+    ui.text_edit_singleline(&mut state.0);
+    
+    let value_label = ui.label("Значение:");
+    ui.text_edit_singleline(&mut state.1);
+    
+    if ui.button("Добавить стиль").clicked() && !state.0.is_empty() {
+        element.styles.insert(state.0.clone(), state.1.clone());
+        state = Default::default(); // Сброс полей после добавления
+    }
+    
+    // Сохраняем состояние
+    ui.data_mut(|d| d.insert_temp(egui::Id::new("new_style_state"), state));
+});
                 });
                 
                 ui.separator();
