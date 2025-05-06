@@ -1,5 +1,6 @@
-mod editor;
 mod models;
+pub mod elements;
+mod editor;
 
 use eframe::{App, CreationContext};
 use models::page::Page;
@@ -14,7 +15,7 @@ struct SiteGeneratorApp {
 impl SiteGeneratorApp {
     fn new(_cc: &CreationContext) -> Self {
         // Создаем тестовую страницу
-        let mut page = Page::new(
+        let page = Page::new(
             "home".to_string(),
             "Главная страница".to_string(),
             "index.html".to_string()

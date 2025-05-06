@@ -1,7 +1,8 @@
-use crate::models::element::{Element, ElementType};
+use crate::elements::{ElementType};
+use crate::elements::button::Button;
 use crate::models::page::Page;
-use egui::{Ui, Context, Rect, Pos2, Vec2, Color32, Stroke};
-use std::collections::HashMap;
+use egui::{Ui, Context, Color32};
+
 
 // Состояние редактора
 #[derive(Default)]
@@ -10,25 +11,13 @@ pub struct Editor {
     selected_element_id: Option<String>,
     // Выбранный тип элемента для добавления
     selected_element_type: Option<ElementType>,
-    // Режим перетаскивания
-    dragging: bool,
-    // Начальная позиция перетаскивания
-    drag_start: Option<Pos2>,
-    // Смещение перетаскивания
-    drag_offset: Vec2,
-    // Элемент, который перетаскивается
-    dragged_element_id: Option<String>,
 }
 
 impl Editor {
     pub fn new() -> Self {
         Self {
             selected_element_id: None,
-            selected_element_type: None,
-            dragging: false,
-            drag_start: None,
-            drag_offset: Vec2::ZERO,
-            dragged_element_id: None,
+            selected_element_type: Some(ElementType::Button), // По умолчанию выбран тип "Кнопка"
         }
     }
     
@@ -83,54 +72,27 @@ impl Editor {
         
         ui.vertical(|ui| {
             if ui.selectable_label(
-                self.selected_element_type == Some(ElementType::Text), 
-                "Текст"
-            ).clicked() {
-                self.selected_element_type = Some(ElementType::Text);
-            }
-            
-            if ui.selectable_label(
                 self.selected_element_type == Some(ElementType::Button), 
                 "Кнопка"
             ).clicked() {
                 self.selected_element_type = Some(ElementType::Button);
             }
-            
-            if ui.selectable_label(
-                self.selected_element_type == Some(ElementType::Image), 
-                "Изображение"
-            ).clicked() {
-                self.selected_element_type = Some(ElementType::Image);
-            }
-            
-            if ui.selectable_label(
-                self.selected_element_type == Some(ElementType::Container), 
-                "Контейнер"
-            ).clicked() {
-                self.selected_element_type = Some(ElementType::Container);
-            }
-            
-            if ui.selectable_label(
-                self.selected_element_type == Some(ElementType::Form), 
-                "Форма"
-            ).clicked() {
-                self.selected_element_type = Some(ElementType::Form);
-            }
-            
-            if ui.selectable_label(
-                self.selected_element_type == Some(ElementType::Link), 
-                "Ссылка"
-            ).clicked() {
-                self.selected_element_type = Some(ElementType::Link);
-            }
         });
         
         ui.separator();
         
-        if let Some(element_type) = &self.selected_element_type {
-            if ui.button("Добавить элемент").clicked() {
-                let element = Element::new(element_type.clone());
-                page.add_element(element);
+        // Добавляем кнопку "Добавить элемент"
+        if ui.button("Добавить элемент").clicked() {
+            match self.selected_element_type {
+                Some(ElementType::Button) => {
+                    // Создаем новую кнопку
+                    let button = Button::new();
+                    // Добавляем кнопку на страницу
+                    page.add_element(Box::new(button));
+                },
+                _ => {
+                    // Здесь будет логика для других типов элементов
+                }
             }
         }
     }
@@ -143,149 +105,25 @@ impl Editor {
             if let Some(element) = page.find_element_mut(element_id) {
                 ui.separator();
                 
-                ui.horizontal(|ui| {
-                    ui.label("ID:");
-                    ui.text_edit_singleline(&mut element.id.clone());
-                });
-                
-                ui.horizontal(|ui| {
-                    ui.label("Тип:");
-                    ui.label(match element.element_type {
-                        ElementType::Text => "Текст",
-                        ElementType::Button => "Кнопка",
-                        ElementType::Image => "Изображение",
-                        ElementType::Container => "Контейнер",
-                        ElementType::Form => "Форма",
-                        ElementType::Link => "Ссылка",
-                        ElementType::Custom(ref name) => name,
-                    });
-                });
-                
-                ui.separator();
-                
-                // Редактирование содержимого
-                match element.element_type {
-                    ElementType::Text | ElementType::Button | ElementType::Link => {
-                        ui.label("Содержимое:");
-                        ui.text_edit_singleline(&mut element.content);
-                    },
-                    ElementType::Image => {
-                        ui.label("Источник изображения:");
-                        let mut src = element.attributes.get("src")
-                            .cloned().unwrap_or_default();
-                        if ui.text_edit_singleline(&mut src).changed() {
-                            element.attributes.insert("src".to_string(), src);
-                        }
-                        
-                        ui.label("Альтернативный текст:");
-                        let mut alt = element.attributes.get("alt")
-                            .cloned().unwrap_or_default();
-                        if ui.text_edit_singleline(&mut alt).changed() {
-                            element.attributes.insert("alt".to_string(), alt);
+                match element.get_element_type() {
+                    ElementType::Button => {
+                        if let Some(button) = element.as_any().downcast_ref::<Button>() {
+                            // Редактирование текста кнопки
+                            ui.label("Текст кнопки:");
+                            let mut content = button.content.clone();
+                            if ui.text_edit_singleline(&mut content).changed() {
+                                if let Some(button_mut) = element.as_any_mut().downcast_mut::<Button>() {
+                                    button_mut.content = content;
+                                }
+                            }
+                            
+                            // Редактирование цветов и других свойств
+                            // ...
                         }
                     },
-                    _ => {}
-                }
-                
-                ui.separator();
-                
-                // Позиция и размер
-                ui.collapsing("Позиция и размер", |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("X:");
-                        let mut x = element.position.0;
-                        if ui.add(egui::DragValue::new(&mut x).speed(1.0)).changed() {
-                            element.position.0 = x;
-                        }
-                        
-                        ui.label("Y:");
-                        let mut y = element.position.1;
-                        if ui.add(egui::DragValue::new(&mut y).speed(1.0)).changed() {
-                            element.position.1 = y;
-                        }
-                    });
-                    
-                    ui.horizontal(|ui| {
-                        ui.label("Ширина:");
-                        let mut width = element.size.0;
-                        if ui.add(egui::DragValue::new(&mut width).speed(1.0)).changed() {
-                            element.size.0 = width;
-                        }
-                        
-                        ui.label("Высота:");
-                        let mut height = element.size.1;
-                        if ui.add(egui::DragValue::new(&mut height).speed(1.0)).changed() {
-                            element.size.1 = height;
-                        }
-                    });
-                });
-                
-                ui.separator();
-                
-                // Стили
-                ui.collapsing("Стили", |ui| {
-                    let mut styles_to_remove = Vec::new();
-                    let mut styles_to_add = HashMap::new();
-                    
-                    for (key, value) in &mut element.styles.clone() {
-                        ui.horizontal(|ui| {
-                            let mut k = key.clone();
-                            let mut v = value.clone();
-                            
-                            if ui.text_edit_singleline(&mut k).changed() {
-                                styles_to_remove.push(key.clone());
-                                styles_to_add.insert(k, v.clone());
-                            }
-                            
-                            if ui.text_edit_singleline(&mut v).changed() {
-                                element.styles.insert(key.clone(), v);
-                            }
-                            
-                            if ui.button("❌").clicked() {
-                                styles_to_remove.push(key.clone());
-                            }
-                        });
+                    _ => {
+                        ui.label("Редактирование этого типа элемента пока не поддерживается");
                     }
-                    
-                    // Удаляем стили, которые нужно удалить
-                    for key in styles_to_remove {
-                        element.styles.remove(&key);
-                    }
-                    
-                    // Добавляем новые стили
-                    for (key, value) in styles_to_add {
-                        element.styles.insert(key, value);
-                    }
-                    
-                    // Добавление нового стиля
-// Добавление нового стиля
-ui.horizontal(|ui| {
-    // Используем состояние egui вместо статических переменных
-    let mut state = ui.data_mut(|d| d.get_temp::<(String, String)>(egui::Id::new("new_style_state"))
-        .unwrap_or_default());
-    
-    let key_label = ui.label("Ключ:");
-    ui.text_edit_singleline(&mut state.0);
-    
-    let value_label = ui.label("Значение:");
-    ui.text_edit_singleline(&mut state.1);
-    
-    if ui.button("Добавить стиль").clicked() && !state.0.is_empty() {
-        element.styles.insert(state.0.clone(), state.1.clone());
-        state = Default::default(); // Сброс полей после добавления
-    }
-    
-    // Сохраняем состояние
-    ui.data_mut(|d| d.insert_temp(egui::Id::new("new_style_state"), state));
-});
-                });
-                
-                ui.separator();
-                
-                // Удаление элемента
-                if ui.button("Удалить элемент").clicked() {
-                    page.remove_element(element_id);
-                    self.selected_element_id = None;
                 }
             } else {
                 ui.label("Элемент не найден");
@@ -309,78 +147,9 @@ ui.horizontal(|ui| {
         painter.rect_filled(rect, 0.0, Color32::WHITE);
         
         // Отрисовываем элементы страницы
-        for element in page.elements.iter() {
-            let element_rect = Rect::from_min_size(
-                Pos2::new(element.position.0, element.position.1),
-                Vec2::new(element.size.0, element.size.1)
-            );
-            
-            // Заливка элемента
-            let fill_color = if Some(element.id.clone()) == self.selected_element_id {
-                Color32::from_rgba_premultiplied(100, 150, 255, 100)
-            } else {
-                Color32::from_rgba_premultiplied(200, 200, 200, 100)
-            };
-            
-            painter.rect_filled(element_rect, 2.0, fill_color);
-            
-            // Рамка элемента
-            let stroke = if Some(element.id.clone()) == self.selected_element_id {
-                Stroke::new(2.0, Color32::BLUE)
-            } else {
-                Stroke::new(1.0, Color32::GRAY)
-            };
-            
-            painter.rect_stroke(element_rect, 2.0, stroke);
-            
-            // Отрисовка текста элемента
-            match element.element_type {
-                ElementType::Text | ElementType::Button | ElementType::Link => {
-                    painter.text(
-                        element_rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        &element.content,
-                        egui::FontId::default(),
-                        Color32::BLACK
-                    );
-                },
-                ElementType::Image => {
-                    painter.text(
-                        element_rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "[Изображение]",
-                        egui::FontId::default(),
-                        Color32::BLACK
-                    );
-                },
-                ElementType::Container => {
-                    painter.text(
-                        element_rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "[Контейнер]",
-                        egui::FontId::default(),
-                        Color32::BLACK
-                    );
-                },
-                ElementType::Form => {
-                    painter.text(
-                        element_rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "[Форма]",
-                        egui::FontId::default(),
-                        Color32::BLACK
-                    );
-                },
-                ElementType::Custom(ref name) => {
-                    painter.text(
-                        element_rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        &format!("[{}]", name),
-                        egui::FontId::default(),
-                        Color32::BLACK
-                    );
-                }
-            }
+        for element in &page.elements {
+            let selected = Some(element.get_id().to_string()) == self.selected_element_id;
+            element.render(&painter, selected);
         }
         
         // Обработка событий мыши
@@ -391,62 +160,22 @@ ui.horizontal(|ui| {
             
             if let Some(element) = page.find_element_at_point(click_pos) {
                 // Выбираем элемент
-                self.selected_element_id = Some(element.id.clone());
+                self.selected_element_id = Some(element.get_id().to_string());
             } else {
                 // Сбрасываем выбор
                 self.selected_element_id = None;
-                
-                // Если выбран тип элемента, создаем новый элемент
-                if let Some(element_type) = &self.selected_element_type {
-                    let mut element = Element::new(element_type.clone());
-                    element.position = click_pos;
-                    page.add_element(element.clone());
-                    self.selected_element_id = Some(element.id);
-                }
             }
         } else if response.dragged() {
             // Перетаскивание
             if let Some(pos) = response.interact_pointer_pos {
-                if !self.dragging {
-                    // Начинаем перетаскивание
-                    self.dragging = true;
-                    self.drag_start = Some(pos);
-                    
-                    // Проверяем, есть ли элемент в точке начала перетаскивания
-                    if self.selected_element_id.is_none() {
-                        let click_pos = (pos.x, pos.y);
-                        if let Some(element) = page.find_element_at_point(click_pos) {
-                            self.selected_element_id = Some(element.id.clone());
-                        }
-                    }
-                    
-                    // Запоминаем перетаскиваемый элемент
-                    self.dragged_element_id = self.selected_element_id.clone();
-                }
-                
-                // Если есть выбранный элемент, перемещаем его
-                if let Some(element_id) = &self.dragged_element_id {
+                if let Some(element_id) = &self.selected_element_id {
                     if let Some(element) = page.find_element_mut(element_id) {
-                        let drag_delta = pos - self.drag_start.unwrap_or(pos);
-                        
-                        if drag_delta.length() > 0.0 {
-                            let new_pos = (
-                                element.position.0 + drag_delta.x - self.drag_offset.x,
-                                element.position.1 + drag_delta.y - self.drag_offset.y
-                            );
-                            
-                            element.position = new_pos;
-                            self.drag_start = Some(pos);
-                        }
+                        // Перемещаем выбранный элемент к текущей позиции мыши
+                        let size = element.get_size();
+                        element.set_position((pos.x - size.0 / 2.0, pos.y - size.1 / 2.0));
                     }
                 }
             }
-        } else if response.drag_released() {
-            // Конец перетаскивания
-            self.dragging = false;
-            self.drag_start = None;
-            self.drag_offset = Vec2::ZERO;
-            self.dragged_element_id = None;
         }
     }
 }
