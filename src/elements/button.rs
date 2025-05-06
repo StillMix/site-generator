@@ -1,8 +1,7 @@
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
 use egui::{Pos2, Rect, Vec2, Color32, Stroke};
 use crate::elements::{ElementBase, ElementType, UIElement};
-
+use std::any::Any;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Button {
     pub base: ElementBase,
@@ -79,6 +78,13 @@ impl UIElement for Button {
     fn set_size(&mut self, size: (f32, f32)) {
         self.base.size = size;
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     
     fn contains_point(&self, point: (f32, f32)) -> bool {
         self.base.contains_point(point)
@@ -91,18 +97,21 @@ impl UIElement for Button {
         );
         
         // Определяем цвет фона
-        let fill_color = if selected {
-            Color32::from_rgba_premultiplied(100, 150, 255, 100)
-        } else {
-            // Пытаемся использовать цвет из стилей или стандартный цвет
-            let bg_color = self.base.styles.get("background-color")
-                .unwrap_or(&"#4CAF50".to_string());
-            
-            match bg_color.as_str() {
-                "#4CAF50" => Color32::from_rgb(76, 175, 80),
-                _ => Color32::LIGHT_GRAY // По умолчанию светло-серый
-            }
-        };
+        // Определяем цвет фона
+let fill_color = if selected {
+    Color32::from_rgba_premultiplied(100, 150, 255, 100)
+} else {
+    // Пытаемся использовать цвет из стилей или стандартный цвет
+    // Создаем копию строки для избежания проблемы с временным значением
+    let bg_color_string = self.base.styles.get("background-color")
+        .map(|s| s.clone())
+        .unwrap_or_else(|| "#4CAF50".to_string());
+        
+    match bg_color_string.as_str() {
+        "#4CAF50" => Color32::from_rgb(76, 175, 80),
+        _ => Color32::LIGHT_GRAY // По умолчанию светло-серый
+    }
+};
         
         // Рисуем фон кнопки
         painter.rect_filled(element_rect, 4.0, fill_color);

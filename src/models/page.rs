@@ -1,11 +1,12 @@
-use serde::{Serialize, Deserialize};
+
 use std::collections::HashMap;
 use uuid::Uuid;
-use std::any::Any;
 
-use crate::elements::{UIElement, UIElementExt};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+use crate::elements::{UIElement};
+
+
+// Убираем derive для структуры Page
 pub struct Page {
     pub id: String,
     pub name: String,
@@ -57,18 +58,3 @@ impl Page {
     }
 }
 
-// Расширение трейта UIElement для приведения типов
-pub trait UIElementExt: UIElement {
-    fn as_any(&self) -> &dyn Any;
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-}
-
-impl<T: UIElement + Any> UIElementExt for T {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-    
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
