@@ -1,4 +1,4 @@
-pub mod button;
+pub mod buttons;
 
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
