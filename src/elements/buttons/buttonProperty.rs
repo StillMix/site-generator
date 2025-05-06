@@ -1,6 +1,5 @@
-use egui::{Ui, Color32};
-use crate::elements::buttons::Button;
-use std::any::Any;
+use egui::Ui;
+use crate::elements::buttons::button::Button;
 use crate::elements::UIElement;
 
 // Структура ColorPicker из editor.rs (перенесем ее сюда)
@@ -457,40 +456,75 @@ impl ButtonProperty {
             let mut custom_corners_changed = false;
             if custom_radius_changed {
                 if custom_radius {
-                    button.base.styles.insert("border-top-left-radius".to_string(), format!("{}px", border_radius_copy));
-                    button.base.styles.insert("border-top-right-radius".to_string(), format!("{}px", border_radius_copy));
-                    button.base.styles.insert("border-bottom-left-radius".to_string(), format!("{}px", border_radius_copy));
-                    button.base.styles.insert("border-bottom-right-radius".to_string(), format!("{}px", border_radius_copy));
+                    // Сохраняем текущее значение для всех углов
+                    let radius_value = format!("{}px", border_radius_copy);
+                    
+                    // Устанавливаем одинаковые значения для всех углов в формате border-radius
+                    button.base.styles.insert(
+                        "border-radius".to_string(), 
+                        format!("{} {} {} {}", radius_value, radius_value, radius_value, radius_value)
+                    );
                 } else {
-                    button.base.styles.remove("border-top-left-radius");
-                    button.base.styles.remove("border-top-right-radius");
-                    button.base.styles.remove("border-bottom-left-radius");
-                    button.base.styles.remove("border-bottom-right-radius");
+                    // Возвращаем единое значение для всех углов
+                    button.base.styles.insert("border-radius".to_string(), format!("{}px", border_radius_copy));
                 }
                 custom_corners_changed = true;
             }
             
-            if custom_radius {
-                for (name, label) in [
-                    ("border-top-left-radius", "Левый верхний:"),
-                    ("border-top-right-radius", "Правый верхний:"),
-                    ("border-bottom-left-radius", "Левый нижний:"),
-                    ("border-bottom-right-radius", "Правый нижний:")
-                ] {
-                    ui.label(label);
-                    let radius = button.base.styles.get(name)
-                        .cloned().unwrap_or_else(|| format!("{}px", border_radius_copy));
-                    
-                    let radius_val = radius.replace("px", "")
-                        .parse::<f32>().unwrap_or(border_radius_copy);
-                    let mut radius_copy = radius_val;
-                    
-                    if ui.add(egui::Slider::new(&mut radius_copy, 0.0..=50.0).step_by(1.0)).changed() {
-                        button.base.styles.insert(name.to_string(), format!("{}px", radius_copy));
-                        custom_corners_changed = true;
-                    }
-                }
-            }
+            // В интерфейсе создаем для пользователя 4 значения для углов
+let mut top_left = border_radius_copy;
+let mut top_right = border_radius_copy;
+let mut bottom_right = border_radius_copy;
+let mut bottom_left = border_radius_copy;
+
+// Если у нас есть установленное значение border-radius, парсим его
+if let Some(border_radius_str) = button.base.styles.get("border-radius") {
+    let parts: Vec<&str> = border_radius_str.split_whitespace().collect();
+    if parts.len() == 4 {
+        // Парсим существующие значения из строки
+        top_left = parts[0].replace("px", "").parse::<f32>().unwrap_or(border_radius_copy);
+        top_right = parts[1].replace("px", "").parse::<f32>().unwrap_or(border_radius_copy);
+        bottom_right = parts[2].replace("px", "").parse::<f32>().unwrap_or(border_radius_copy);
+        bottom_left = parts[3].replace("px", "").parse::<f32>().unwrap_or(border_radius_copy);
+    }
+}
+
+// При изменении слайдеров обновляем общую строку
+ui.label("Левый верхний:");
+if ui.add(egui::Slider::new(&mut top_left, 0.0..=50.0).step_by(1.0)).changed() {
+    button.base.styles.insert(
+        "border-radius".to_string(), 
+        format!("{}px {}px {}px {}px", top_left, top_right, bottom_right, bottom_left)
+    );
+    custom_corners_changed = true;
+}
+
+ui.label("Правый верхний:");
+if ui.add(egui::Slider::new(&mut top_right, 0.0..=50.0).step_by(1.0)).changed() {
+    button.base.styles.insert(
+        "border-radius".to_string(), 
+        format!("{}px {}px {}px {}px", top_left, top_right, bottom_right, bottom_left)
+    );
+    custom_corners_changed = true;
+}
+
+ui.label("Правый нижний:");
+if ui.add(egui::Slider::new(&mut bottom_right, 0.0..=50.0).step_by(1.0)).changed() {
+    button.base.styles.insert(
+        "border-radius".to_string(), 
+        format!("{}px {}px {}px {}px", top_left, top_right, bottom_right, bottom_left)
+    );
+    custom_corners_changed = true;
+}
+
+ui.label("Левый нижний:");
+if ui.add(egui::Slider::new(&mut bottom_left, 0.0..=50.0).step_by(1.0)).changed() {
+    button.base.styles.insert(
+        "border-radius".to_string(), 
+        format!("{}px {}px {}px {}px", top_left, top_right, bottom_right, bottom_left)
+    );
+    custom_corners_changed = true;
+}
             
             // Возвращаем true, если было изменено хотя бы одно свойство
             return content_changed || 

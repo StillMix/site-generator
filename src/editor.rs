@@ -1,6 +1,6 @@
 use crate::elements::ElementType;
 use crate::elements::UIElement;
-use crate::elements::buttons::Button;
+use crate::elements::buttons::button::Button;
 use crate::models::page::Page;
 use egui::{Ui, Context, Color32};
 
@@ -199,7 +199,7 @@ impl Editor {
                     match self.selected_element_type {
                         Some(ElementType::Button) => {
                             // Создаем новую кнопку
-                            let mut button = crate::elements::button::Button::new();
+                            let mut button = Button::new();
                             // Устанавливаем позицию, учитывая центр кнопки
                             button.set_position((pos.0 - 50.0, pos.1 - 25.0));
                             // Добавляем кнопку на страницу
@@ -253,7 +253,7 @@ impl Editor {
                         match self.selected_element_type {
                             Some(ElementType::Button) => {
                                 // Создаем новую кнопку
-                                let mut button = crate::elements::button::Button::new();
+                                let mut button = Button::new();
                                 // Устанавливаем позицию, учитывая центр кнопки
                                 button.set_position((pos.x - 50.0, pos.y - 25.0));
                                 // Добавляем кнопку на страницу
