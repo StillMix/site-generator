@@ -97,41 +97,91 @@ impl UIElement for Button {
         );
         
         // Определяем цвет фона
-let fill_color = if selected {
-    Color32::from_rgba_premultiplied(100, 150, 255, 100)
-} else {
-    // Пытаемся использовать цвет из стилей или стандартный цвет
-    // Создаем копию строки для избежания проблемы с временным значением
-    let bg_color_string = self.base.styles.get("background-color")
-        .map(|s| s.clone())
-        .unwrap_or_else(|| "#4CAF50".to_string());
-        
-    match bg_color_string.as_str() {
-        "#4CAF50" => Color32::from_rgb(76, 175, 80),
-        _ => Color32::LIGHT_GRAY // По умолчанию светло-серый
-    }
-};
-        
-        // Рисуем фон кнопки
-        painter.rect_filled(element_rect, 4.0, fill_color);
-        
-        // Рисуем рамку кнопки
-        let stroke = if selected {
-            Stroke::new(2.0, Color32::BLUE)
-        } else {
-            Stroke::new(1.0, Color32::DARK_GRAY)
+        let bg_color_string = self.base.styles.get("background-color")
+            .map(|s| s.clone())
+            .unwrap_or_else(|| "#4CAF50".to_string());
+            
+        let base_color = match bg_color_string.as_str() {
+            "#4CAF50" => Color32::from_rgb(76, 175, 80),
+            _ => {
+                // Простой парсер для цветов в формате HEX
+                if bg_color_string.starts_with('#') && bg_color_string.len() >= 7 {
+                    let r = u8::from_str_radix(&bg_color_string[1..3], 16).unwrap_or(76);
+                    let g = u8::from_str_radix(&bg_color_string[3..5], 16).unwrap_or(175);
+                    let b = u8::from_str_radix(&bg_color_string[5..7], 16).unwrap_or(80);
+                    Color32::from_rgb(r, g, b)
+                } else {
+                    Color32::from_rgb(76, 175, 80) // По умолчанию зеленый
+                }
+            }
         };
         
-        painter.rect_stroke(element_rect, 4.0, stroke);
+        // Применяем выделение, сохраняя базовый цвет
+        let fill_color = if selected {
+            // При выделении делаем цвет немного ярче, сохраняя оттенок
+            base_color.gamma_multiply(1.2)
+        } else {
+            base_color
+        };
+        
+        // Получаем значение скругления углов
+        let border_radius = self.base.styles.get("border-radius")
+            .map(|s| s.replace("px", "").parse::<f32>().unwrap_or(4.0))
+            .unwrap_or(4.0);
+        
+        // Рисуем фон кнопки
+        painter.rect_filled(element_rect, border_radius, fill_color);
+        
+        // Определяем параметры обводки
+        let border_width = self.base.styles.get("border-width")
+            .map(|s| s.replace("px", "").parse::<f32>().unwrap_or(1.0))
+            .unwrap_or(1.0);
+        
+        let border_color_string = self.base.styles.get("border-color")
+            .map(|s| s.clone())
+            .unwrap_or_else(|| "#000000".to_string());
+        
+        let border_color = if border_color_string.starts_with('#') && border_color_string.len() >= 7 {
+            let r = u8::from_str_radix(&border_color_string[1..3], 16).unwrap_or(0);
+            let g = u8::from_str_radix(&border_color_string[3..5], 16).unwrap_or(0);
+            let b = u8::from_str_radix(&border_color_string[5..7], 16).unwrap_or(0);
+            Color32::from_rgb(r, g, b)
+        } else {
+            Color32::BLACK
+        };
+        
+        // Рисуем рамку кнопки, если ширина обводки больше 0
+        if border_width > 0.0 {
+            let stroke = if selected {
+                // При выделении добавляем дополнительную рамку
+                Stroke::new(border_width + 1.0, border_color) 
+            } else {
+                Stroke::new(border_width, border_color)
+            };
+            
+            painter.rect_stroke(element_rect, border_radius, stroke);
+        } else if selected {
+            // Если обводка выключена, но кнопка выделена, рисуем рамку выделения
+            painter.rect_stroke(element_rect, border_radius, Stroke::new(1.0, Color32::BLUE));
+        }
+        
+        // Определяем цвет текста
+        let text_color_string = self.base.styles.get("color")
+            .map(|s| s.clone())
+            .unwrap_or_else(|| "#FFFFFF".to_string());
+        
+        let text_color = if text_color_string.starts_with('#') && text_color_string.len() >= 7 {
+            let r = u8::from_str_radix(&text_color_string[1..3], 16).unwrap_or(255);
+            let g = u8::from_str_radix(&text_color_string[3..5], 16).unwrap_or(255);
+            let b = u8::from_str_radix(&text_color_string[5..7], 16).unwrap_or(255);
+            Color32::from_rgb(r, g, b)
+        } else if text_color_string == "#FFFFFF" {
+            Color32::WHITE
+        } else {
+            Color32::BLACK
+        };
         
         // Рисуем текст кнопки
-        let text_color = self.base.styles.get("color")
-            .map(|c| match c.as_str() {
-                "#FFFFFF" => Color32::WHITE,
-                _ => Color32::BLACK
-            })
-            .unwrap_or(Color32::BLACK);
-        
         painter.text(
             element_rect.center(),
             egui::Align2::CENTER_CENTER,

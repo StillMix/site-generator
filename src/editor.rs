@@ -120,6 +120,7 @@ impl Editor {
         });
     }
     // Показать редактор свойств
+    // Показать редактор свойств
     fn show_properties(&mut self, ui: &mut Ui, page: &mut Page) {
         ui.heading("Свойства");
         
@@ -129,18 +130,178 @@ impl Editor {
                 
                 match element.get_element_type() {
                     ElementType::Button => {
-                        if let Some(button) = element.as_any().downcast_ref::<Button>() {
+                        // Сначала проверяем, что это кнопка
+                        if element.as_any().downcast_ref::<Button>().is_some() {
                             // Редактирование текста кнопки
                             ui.label("Текст кнопки:");
-                            let mut content = button.content.clone();
+                            
+                            // Получаем копию текста для редактирования
+                            let mut content = {
+                                let button = element.as_any().downcast_ref::<Button>().unwrap();
+                                button.content.clone()
+                            };
+                            
                             if ui.text_edit_singleline(&mut content).changed() {
-                                if let Some(button_mut) = element.as_any_mut().downcast_mut::<Button>() {
-                                    button_mut.content = content;
+                                // Применяем изменения только если был изменен текст
+                                if let Some(button) = element.as_any_mut().downcast_mut::<Button>() {
+                                    button.content = content;
                                 }
                             }
                             
-                            // Редактирование цветов и других свойств
-                            // ...
+                            ui.separator();
+                            ui.heading("Стили");
+                            
+                            // Цвет фона - работаем с копией для избежания конфликтов заимствования
+                            {
+                                ui.label("Цвет фона:");
+                                let mut bg_color = {
+                                    let button = element.as_any().downcast_ref::<Button>().unwrap();
+                                    button.base.styles.get("background-color")
+                                        .cloned().unwrap_or_else(|| "#4CAF50".to_string())
+                                };
+                                
+                                if ui.text_edit_singleline(&mut bg_color).changed() {
+                                    if let Some(button) = element.as_any_mut().downcast_mut::<Button>() {
+                                        button.base.styles.insert("background-color".to_string(), bg_color);
+                                    }
+                                }
+                            }
+                            
+                            // Цвет текста
+                            {
+                                ui.label("Цвет текста:");
+                                let mut text_color = {
+                                    let button = element.as_any().downcast_ref::<Button>().unwrap();
+                                    button.base.styles.get("color")
+                                        .cloned().unwrap_or_else(|| "#FFFFFF".to_string())
+                                };
+                                
+                                if ui.text_edit_singleline(&mut text_color).changed() {
+                                    if let Some(button) = element.as_any_mut().downcast_mut::<Button>() {
+                                        button.base.styles.insert("color".to_string(), text_color);
+                                    }
+                                }
+                            }
+                            
+                            // Обводка
+                            {
+                                ui.label("Обводка:");
+                                let border_width = {
+                                    let button = element.as_any().downcast_ref::<Button>().unwrap();
+                                    button.base.styles.get("border-width")
+                                        .cloned().unwrap_or_else(|| "1px".to_string())
+                                };
+                                
+                                let mut border_enabled = !border_width.starts_with("0");
+                                
+                                if ui.checkbox(&mut border_enabled, "Включить обводку").changed() {
+                                    if let Some(button) = element.as_any_mut().downcast_mut::<Button>() {
+                                        if border_enabled {
+                                            button.base.styles.insert("border-width".to_string(), "1px".to_string());
+                                            button.base.styles.insert("border-style".to_string(), "solid".to_string());
+                                            button.base.styles.insert("border-color".to_string(), "#000000".to_string());
+                                        } else {
+                                            button.base.styles.insert("border-width".to_string(), "0px".to_string());
+                                        }
+                                    }
+                                }
+                                
+                                if border_enabled {
+                                    // Толщина обводки
+                                    ui.label("Толщина обводки (px):");
+                                    let mut border_width_val = border_width.replace("px", "")
+                                        .parse::<f32>().unwrap_or(1.0);
+                                    
+                                    if ui.add(egui::Slider::new(&mut border_width_val, 1.0..=10.0).step_by(1.0)).changed() {
+                                        if let Some(button) = element.as_any_mut().downcast_mut::<Button>() {
+                                            button.base.styles.insert("border-width".to_string(), format!("{}px", border_width_val));
+                                        }
+                                    }
+                                    
+                                    // Цвет обводки
+                                    ui.label("Цвет обводки:");
+                                    let mut border_color = {
+                                        let button = element.as_any().downcast_ref::<Button>().unwrap();
+                                        button.base.styles.get("border-color")
+                                            .cloned().unwrap_or_else(|| "#000000".to_string())
+                                    };
+                                    
+                                    if ui.text_edit_singleline(&mut border_color).changed() {
+                                        if let Some(button) = element.as_any_mut().downcast_mut::<Button>() {
+                                            button.base.styles.insert("border-color".to_string(), border_color);
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Скругление углов
+                            {
+                                ui.label("Скругление углов:");
+                                let border_radius = {
+                                    let button = element.as_any().downcast_ref::<Button>().unwrap();
+                                    button.base.styles.get("border-radius")
+                                        .cloned().unwrap_or_else(|| "4px".to_string())
+                                };
+                                
+                                let border_radius_val = border_radius.replace("px", "")
+                                    .parse::<f32>().unwrap_or(4.0);
+                                let mut border_radius_copy = border_radius_val;
+                                
+                                if ui.add(egui::Slider::new(&mut border_radius_copy, 0.0..=50.0).step_by(1.0)).changed() {
+                                    if let Some(button) = element.as_any_mut().downcast_mut::<Button>() {
+                                        button.base.styles.insert("border-radius".to_string(), format!("{}px", border_radius_copy));
+                                    }
+                                }
+                                
+                                // Индивидуальное скругление углов
+                                let has_custom_radius = {
+                                    let button = element.as_any().downcast_ref::<Button>().unwrap();
+                                    button.base.styles.contains_key("border-top-left-radius")
+                                };
+                                let mut custom_radius = has_custom_radius;
+                                
+                                if ui.checkbox(&mut custom_radius, "Настроить углы по отдельности").changed() {
+                                    if let Some(button) = element.as_any_mut().downcast_mut::<Button>() {
+                                        if custom_radius {
+                                            button.base.styles.insert("border-top-left-radius".to_string(), format!("{}px", border_radius_copy));
+                                            button.base.styles.insert("border-top-right-radius".to_string(), format!("{}px", border_radius_copy));
+                                            button.base.styles.insert("border-bottom-left-radius".to_string(), format!("{}px", border_radius_copy));
+                                            button.base.styles.insert("border-bottom-right-radius".to_string(), format!("{}px", border_radius_copy));
+                                        } else {
+                                            button.base.styles.remove("border-top-left-radius");
+                                            button.base.styles.remove("border-top-right-radius");
+                                            button.base.styles.remove("border-bottom-left-radius");
+                                            button.base.styles.remove("border-bottom-right-radius");
+                                        }
+                                    }
+                                }
+                                
+                                if custom_radius {
+                                    for (name, label) in [
+                                        ("border-top-left-radius", "Левый верхний:"),
+                                        ("border-top-right-radius", "Правый верхний:"),
+                                        ("border-bottom-left-radius", "Левый нижний:"),
+                                        ("border-bottom-right-radius", "Правый нижний:")
+                                    ] {
+                                        ui.label(label);
+                                        let radius = {
+                                            let button = element.as_any().downcast_ref::<Button>().unwrap();
+                                            button.base.styles.get(name)
+                                                .cloned().unwrap_or_else(|| format!("{}px", border_radius_copy))
+                                        };
+                                        
+                                        let radius_val = radius.replace("px", "")
+                                            .parse::<f32>().unwrap_or(border_radius_copy);
+                                        let mut radius_copy = radius_val;
+                                        
+                                        if ui.add(egui::Slider::new(&mut radius_copy, 0.0..=50.0).step_by(1.0)).changed() {
+                                            if let Some(button) = element.as_any_mut().downcast_mut::<Button>() {
+                                                button.base.styles.insert(name.to_string(), format!("{}px", radius_copy));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     },
                     _ => {
@@ -156,7 +317,6 @@ impl Editor {
         }
     }
     
-    // Показать область редактирования
     // Показать область редактирования
     fn show_editor_area(&mut self, ui: &mut Ui, page: &mut Page) {
         // Отладочный вывод состояния перетаскивания
