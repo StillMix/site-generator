@@ -43,7 +43,7 @@ impl Editor {
         });
         
         egui::SidePanel::left("elements").resizable(true).min_width(200.0).show(ctx, |ui| {
-            self.show_elements_panel(ui);
+            self.show_elements_panel(ui, page);
         });
         
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -76,7 +76,7 @@ impl Editor {
     }
     
     // Показать панель элементов
-    fn show_elements_panel(&mut self, ui: &mut Ui) {
+    fn show_elements_panel(&mut self, ui: &mut Ui, page: &mut Page) {
         ui.heading("Элементы");
         
         ui.separator();

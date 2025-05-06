@@ -2,7 +2,6 @@ mod editor;
 mod models;
 
 use eframe::{App, CreationContext};
-use models::element::{Element, ElementType};
 use models::page::Page;
 use editor::Editor;
 
