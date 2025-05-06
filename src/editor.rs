@@ -71,32 +71,50 @@ impl Editor {
         });
     }
     
-    // Показать панель элементов
-    // Показать панель элементов
     fn show_elements_panel(&mut self, ui: &mut Ui, _page: &mut Page) {
         ui.heading("Элементы");
         
         ui.separator();
         
         ui.vertical(|ui| {
-            // Создаем кнопку, которую можно перетаскивать
-            let btn_response = ui.button("Кнопка");
+            // Настраиваем сенсор для кнопки, чтобы явно разрешить определение перетаскивания
+            let response = ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                ui.add(egui::Button::new("Кнопка").sense(egui::Sense::click_and_drag()))
+            }).inner;
+            
+            // Отслеживаем наведение курсора на элемент (сделаем вывод только при изменении)
+            static mut WAS_HOVERED: bool = false;
+            if response.hovered() {
+                if unsafe { !WAS_HOVERED } {
+                    println!("Пользователь навелся на элемент в списке: Кнопка");
+                    unsafe { WAS_HOVERED = true; }
+                }
+            } else {
+                unsafe { WAS_HOVERED = false; }
+            }
             
             // Обрабатываем клик на кнопке
-            if btn_response.clicked() {
+            if response.clicked() {
                 self.selected_element_type = Some(ElementType::Button);
+                println!("Пользователь кликнул на элемент в списке: Кнопка");
             }
             
-            // Проверяем, начато ли перетаскивание
-            if btn_response.drag_started() {
+            // Проверяем состояние мыши напрямую
+            let is_button_down = ui.input(|i| i.pointer.primary_down());
+            let is_dragging = ui.input(|i| i.pointer.any_down() && i.pointer.is_moving());
+            
+            // Обнаружение начала перетаскивания
+            if response.hovered() && is_button_down && !self.dragging_new_element {
                 self.dragging_new_element = true;
                 self.selected_element_type = Some(ElementType::Button);
+                println!("Пользователь зажал ЛКМ на элементе в списке: Кнопка");
             }
             
-            // Обновляем позицию мыши во время перетаскивания
-            if self.dragging_new_element && btn_response.dragged() {
+            // Проверяем перетаскивание
+            if self.dragging_new_element && is_dragging {
                 if let Some(pos) = ui.ctx().pointer_interact_pos() {
                     self.mouse_pos = Some((pos.x, pos.y));
+                    println!("Перетаскивание элемента Кнопка на позицию: ({:.1}, {:.1})", pos.x, pos.y);
                 }
             }
         });
@@ -167,16 +185,31 @@ impl Editor {
     }
     
     // Если перетаскиваем новый элемент, отображаем его предпросмотр
-    if self.dragging_new_element {
+    if self.dragging_new_element && !ui.input(|i| i.pointer.primary_down()) {
+        println!("Пользователь завершил перетаскивание элемента");
         if let Some(pos) = self.mouse_pos {
-            // Создаем временную кнопку для отображения предпросмотра
-            if let Some(ElementType::Button) = self.selected_element_type {
-                let mut preview_button = crate::elements::button::Button::new();
-                preview_button.set_position((pos.0 - 50.0, pos.1 - 25.0)); // Центрируем кнопку относительно курсора
-                preview_button.render(&painter, true);
+            // Проверяем, что позиция находится внутри области редактирования
+            if rect.contains(egui::Pos2::new(pos.0, pos.1)) {
+                match self.selected_element_type {
+                    Some(ElementType::Button) => {
+                        // Создаем новую кнопку
+                        let mut button = crate::elements::button::Button::new();
+                        // Устанавливаем позицию, учитывая центр кнопки
+                        button.set_position((pos.0 - 50.0, pos.1 - 25.0));
+                        // Добавляем кнопку на страницу
+                        page.add_element(Box::new(button));
+                        println!("Добавлена новая кнопка в позиции ({:.1}, {:.1})", pos.0, pos.1);
+                    },
+                    _ => {
+                        // Здесь будет логика для других типов элементов
+                    }
+                }
+            } else {
+                println!("Перетаскивание завершено вне области редактирования");
             }
-            // Здесь можно добавить другие типы элементов
         }
+        // Завершаем перетаскивание
+        self.dragging_new_element = false;
     }
     
     // Обработка событий мыши
@@ -207,9 +240,10 @@ impl Editor {
     }else if response.drag_released() {
         // Отпускание кнопки мыши после перетаскивания
         if self.dragging_new_element {
-            if let Some(pos) = ui.ctx().pointer_interact_pos() {  // Используем ctx().pointer_interact_pos() вместо response.interact_pointer_pos
+            println!("Пользователь завершил перетаскивание элемента");
+            if let Some(pos) = ui.ctx().pointer_interact_pos() {
                 // Проверяем, что позиция находится внутри области редактирования
-                if rect.contains(pos)  {
+                if rect.contains(pos) {
                     match self.selected_element_type {
                         Some(ElementType::Button) => {
                             // Создаем новую кнопку
@@ -224,6 +258,8 @@ impl Editor {
                             // Здесь будет логика для других типов элементов
                         }
                     }
+                } else {
+                    println!("Перетаскивание завершено вне области редактирования");
                 }
             }
             // Завершаем перетаскивание
@@ -233,8 +269,11 @@ impl Editor {
     
 
 // Отменяем перетаскивание, если кнопка мыши отпущена вне редактора
-if !ui.input(|i| i.pointer.any_down()) { // Исправлено с ui.ctx().is_pointer_button_down()
-    self.dragging_new_element = false;
+if !ui.input(|i| i.pointer.any_down()) {
+    if self.dragging_new_element {
+        println!("Перетаскивание отменено");
+        self.dragging_new_element = false;
+    }
 }
 }
 }
